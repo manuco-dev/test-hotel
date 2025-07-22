@@ -3,12 +3,11 @@ import { createBot, createProvider, createFlow, addKeyword, utils } from '@build
 import { MemoryDB as Database } from '@builderbot/bot'
 import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
 import axios from 'axios'
-import { startAdminPanel } from './admin/adminServer'
 
 const PORT = process.env.PORT ?? 3008
 
 // Datos simulados del hotel
-export const hotelData = {
+const hotelData = {
     meals: {
         breakfast: "🍳 Desayuno de hoy: Huevos revueltos, pan recién horneado, frutas frescas, café/té",
         lunch: "🍝 Almuerzo de hoy: Pasta al pesto, ensalada César, sopa del día",
@@ -144,7 +143,6 @@ const main = async () => {
     })
 
     httpServer(+PORT)
-    startAdminPanel() // Iniciamos el panel de administración
 }
 
 main()
