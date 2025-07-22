@@ -5,19 +5,11 @@ import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
 import axios from 'axios'
 import OpenAI from 'openai'
 import * as dotenv from 'dotenv'
-import express from 'express'
-import cors from 'cors'
 
 // Configurar variables de entorno
 dotenv.config()
 
 const PORT = 3008
-const app = express()
-
-// Configurar middleware
-app.use(cors())
-app.use(express.json())
-app.use(express.static('public'))
 
 console.log('🚀 Iniciando el bot...')
 
@@ -25,30 +17,6 @@ console.log('🚀 Iniciando el bot...')
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 })
-
-// Función para interactuar con ChatGPT
-const chatWithGPT = async (userMessage: string) => {
-    try {
-        const completion = await openai.chat.completions.create({
-            messages: [
-                {
-                    role: "system",
-                    content: "Eres un asistente virtual de hotel muy amable y servicial. Proporcionas información sobre el Hotel Paradise y ayudas a los huéspedes con sus consultas. Mantienes un tono profesional pero amigable."
-                },
-                {
-                    role: "user",
-                    content: userMessage
-                }
-            ],
-            model: "gpt-3.5-turbo",
-        })
-
-        return completion.choices[0]?.message?.content || "Lo siento, no pude procesar tu consulta."
-    } catch (error) {
-        console.error('Error al comunicarse con ChatGPT:', error)
-        return "Lo siento, hubo un error al procesar tu consulta. Por favor, intenta de nuevo más tarde."
-    }
-}
 
 // Datos simulados del hotel
 const hotelData = {
@@ -77,29 +45,29 @@ const hotelData = {
     ]
 }
 
-// Función para obtener el clima (simulada por ahora, pero preparada para API real)
-const getWeather = async () => {
+// Función para interactuar con ChatGPT
+const askChatGPT = async (prompt: string, context: string = '') => {
     try {
-        // Aquí podrías integrar una API real del clima
-        return "🌤️ 25°C - Parcialmente nublado con probabilidad de lluvia por la tarde"
+        const completion = await openai.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: `Eres un asistente virtual del Hotel Paradise, un hotel de lujo. ${context}`
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+            model: "gpt-3.5-turbo",
+        })
+
+        return completion.choices[0]?.message?.content || "Lo siento, no pude procesar tu consulta."
     } catch (error) {
-        return "No se pudo obtener la información del clima"
+        console.error('Error al comunicarse con ChatGPT:', error)
+        return "Lo siento, hubo un error al procesar tu consulta. Por favor, intenta de nuevo más tarde."
     }
 }
-
-// Flujo para consultas generales con ChatGPT
-const chatGPTFlow = addKeyword<Provider, Database>(['consulta', 'pregunta', 'ayuda'])
-    .addAnswer([
-        '¿En qué puedo ayudarte? Puedes hacerme cualquier pregunta sobre el hotel.',
-        'Para volver al menú principal, escribe *menu*'
-    ].join('\n'))
-    .addAction(async (ctx, { flowDynamic }) => {
-        const userMessage = ctx.body
-        if (userMessage.toLowerCase() === 'menu') return
-
-        const response = await chatWithGPT(userMessage)
-        await flowDynamic(response)
-    })
 
 const menuFlow = addKeyword<Provider, Database>(['menu', 'opciones'])
     .addAnswer([
@@ -162,14 +130,37 @@ const plansFlow = addKeyword<Provider, Database>(['4', 'planes'])
 
 const weatherFlow = addKeyword<Provider, Database>(['5', 'clima'])
     .addAction(async (_, { flowDynamic }) => {
-        const weather = await getWeather()
+        const weatherPrompt = "Actúa como un experto meteorólogo y proporciona un pronóstico del clima actual para un hotel de lujo. Incluye temperatura, condiciones y recomendaciones para los huéspedes. Mantén la respuesta corta y concisa."
+        const weather = await askChatGPT(weatherPrompt)
         await flowDynamic([
-            '🌡️ *Clima actual*',
+            '🌡️ *Pronóstico del Clima*',
             '',
             weather,
             '',
             'Escribe *menu* para volver al menú principal'
         ].join('\n'))
+    })
+
+const chatGPTFlow = addKeyword<Provider, Database>(['consulta', 'pregunta', 'ayuda'])
+    .addAnswer([
+        '¿En qué puedo ayudarte? Puedes preguntarme cualquier cosa sobre el hotel.',
+        'Para volver al menú principal, escribe *menu*'
+    ].join('\n'))
+    .addAction(async (ctx, { flowDynamic }) => {
+        const userMessage = ctx.body
+        if (userMessage.toLowerCase() === 'menu') return
+
+        const context = `
+            Responde como un concierge profesional del Hotel Paradise.
+            Información del hotel:
+            - Tenemos restaurantes de diferentes especialidades
+            - Ofrecemos actividades diarias como yoga, natación y entretenimiento nocturno
+            - Contamos con diferentes planes: Todo Incluido, Aventura, Relax y Familiar
+            - Nuestro objetivo es brindar una experiencia de lujo y confort
+            Mantén las respuestas concisas pero informativas y siempre con un tono amable y profesional.
+        `
+        const response = await askChatGPT(userMessage, context)
+        await flowDynamic(response)
     })
 
 const welcomeFlow = addKeyword<Provider, Database>(['hola', 'hi', 'buenos dias', 'buenas'])
@@ -185,6 +176,12 @@ const welcomeFlow = addKeyword<Provider, Database>(['hola', 'hi', 'buenos dias',
         '¡Estoy aquí para hacer tu estancia más placentera! 🌟'
     ].join('\n'))
 
+const fallbackFlow = addKeyword<Provider, Database>([''])
+    .addAction(async (ctx, { flowDynamic }) => {
+        const response = await askChatGPT(ctx.body, "Responde de manera amable y concisa. Si no entiendes la consulta, sugiere usar el comando 'menu' para ver las opciones disponibles.")
+        await flowDynamic(response)
+    })
+
 const main = async () => {
     console.log('📱 Configurando el flujo del bot...')
     const adapterFlow = createFlow([
@@ -195,7 +192,8 @@ const main = async () => {
         restaurantsFlow,
         plansFlow,
         weatherFlow,
-        chatGPTFlow
+        chatGPTFlow,
+        fallbackFlow
     ])
     
     console.log('🔄 Iniciando proveedor de WhatsApp...')
