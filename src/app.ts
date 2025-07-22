@@ -2,64 +2,136 @@ import { join } from 'path'
 import { createBot, createProvider, createFlow, addKeyword, utils } from '@builderbot/bot'
 import { MemoryDB as Database } from '@builderbot/bot'
 import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
+import axios from 'axios'
 
 const PORT = process.env.PORT ?? 3008
 
-const discordFlow = addKeyword<Provider, Database>('doc').addAnswer(
-    ['You can see the documentation here', '📄 https://builderbot.app/docs \n', 'Do you want to continue? *yes*'].join(
-        '\n'
-    ),
-    { capture: true },
-    async (ctx, { gotoFlow, flowDynamic }) => {
-        if (ctx.body.toLocaleLowerCase().includes('yes')) {
-            return gotoFlow(registerFlow)
-        }
-        await flowDynamic('Thanks!')
-        return
+// Datos simulados del hotel
+const hotelData = {
+    meals: {
+        breakfast: "🍳 Desayuno de hoy: Huevos revueltos, pan recién horneado, frutas frescas, café/té",
+        lunch: "🍝 Almuerzo de hoy: Pasta al pesto, ensalada César, sopa del día",
+        dinner: "🍖 Cena de hoy: Filete de res, puré de papas, vegetales asados"
+    },
+    activities: [
+        "🏊‍♂️ 9:00 AM - Clase de natación en la piscina",
+        "🧘‍♀️ 11:00 AM - Yoga en el jardín",
+        "🎯 3:00 PM - Torneo de dardos en el bar",
+        "💃 8:00 PM - Noche de baile latino"
+    ],
+    restaurants: [
+        "🍽️ La Trattoria Di Marco - Comida italiana (⭐⭐⭐⭐½)",
+        "🥘 El Rincón Criollo - Comida local (⭐⭐⭐⭐)",
+        "🍣 Sushi Zen - Comida japonesa (⭐⭐⭐⭐)",
+        "🥩 The Grill House - Carnes y parrilla (⭐⭐⭐⭐½)"
+    ],
+    hotelPlans: [
+        "🌟 Plan Todo Incluido - Comidas y bebidas ilimitadas",
+        "🎯 Plan Aventura - Incluye tours y actividades extremas",
+        "💆‍♀️ Plan Relax - Acceso ilimitado al spa",
+        "👨‍👩‍👦 Plan Familiar - Actividades para niños y descuentos"
+    ]
+}
+
+// Función para obtener el clima (simulada por ahora, pero preparada para API real)
+const getWeather = async () => {
+    try {
+        // Aquí podrías integrar una API real del clima
+        return "🌤️ 25°C - Parcialmente nublado con probabilidad de lluvia por la tarde"
+    } catch (error) {
+        return "No se pudo obtener la información del clima"
     }
-)
+}
 
-const welcomeFlow = addKeyword<Provider, Database>(['hi', 'hello', 'hola'])
-    .addAnswer(`🙌 Hello welcome to this *Chatbot*`)
-    .addAnswer(
-        [
-            'I share with you the following links of interest about the project',
-            '👉 *doc* to view the documentation',
-        ].join('\n'),
-        { delay: 800, capture: true },
-        async (ctx, { fallBack }) => {
-            if (!ctx.body.toLocaleLowerCase().includes('doc')) {
-                return fallBack('You should type *doc*')
-            }
-            return
-        },
-        [discordFlow]
-    )
+const menuFlow = addKeyword<Provider, Database>(['menu', 'opciones', '1'])
+    .addAnswer([
+        '🏨 *Bienvenido al Hotel Paradise*',
+        '',
+        'Selecciona una opción:',
+        '',
+        '1️⃣ Ver menú del día',
+        '2️⃣ Actividades de hoy',
+        '3️⃣ Restaurantes recomendados',
+        '4️⃣ Planes del hotel',
+        '5️⃣ Clima actual',
+        '',
+        'Responde con el número de la opción que deseas consultar'
+    ].join('\n'))
 
-const registerFlow = addKeyword<Provider, Database>(utils.setEvent('REGISTER_FLOW'))
-    .addAnswer(`What is your name?`, { capture: true }, async (ctx, { state }) => {
-        await state.update({ name: ctx.body })
-    })
-    .addAnswer('What is your age?', { capture: true }, async (ctx, { state }) => {
-        await state.update({ age: ctx.body })
-    })
-    .addAction(async (_, { flowDynamic, state }) => {
-        await flowDynamic(`${state.get('name')}, thanks for your information!: Your age: ${state.get('age')}`)
+const mealsFlow = addKeyword<Provider, Database>(['1', 'menu del dia', 'comida'])
+    .addAnswer([
+        '🍽️ *Menú del día*',
+        '',
+        '*Desayuno*',
+        hotelData.meals.breakfast,
+        '',
+        '*Almuerzo*',
+        hotelData.meals.lunch,
+        '',
+        '*Cena*',
+        hotelData.meals.dinner,
+        '',
+        'Escribe *menu* para volver al menú principal'
+    ].join('\n'))
+
+const activitiesFlow = addKeyword<Provider, Database>(['2', 'actividades'])
+    .addAnswer([
+        '📅 *Actividades de hoy*',
+        '',
+        ...hotelData.activities,
+        '',
+        'Escribe *menu* para volver al menú principal'
+    ].join('\n'))
+
+const restaurantsFlow = addKeyword<Provider, Database>(['3', 'restaurantes'])
+    .addAnswer([
+        '🍽️ *Restaurantes Recomendados*',
+        '',
+        ...hotelData.restaurants,
+        '',
+        'Escribe *menu* para volver al menú principal'
+    ].join('\n'))
+
+const plansFlow = addKeyword<Provider, Database>(['4', 'planes'])
+    .addAnswer([
+        '💫 *Planes del Hotel*',
+        '',
+        ...hotelData.hotelPlans,
+        '',
+        'Escribe *menu* para volver al menú principal'
+    ].join('\n'))
+
+const weatherFlow = addKeyword<Provider, Database>(['5', 'clima'])
+    .addAction(async (_, { flowDynamic }) => {
+        const weather = await getWeather()
+        await flowDynamic([
+            '🌡️ *Clima actual*',
+            '',
+            weather,
+            '',
+            'Escribe *menu* para volver al menú principal'
+        ].join('\n'))
     })
 
-const fullSamplesFlow = addKeyword<Provider, Database>(['samples', utils.setEvent('SAMPLES')])
-    .addAnswer(`💪 I'll send you a lot files...`)
-    .addAnswer(`Send image from Local`, { media: join(process.cwd(), 'assets', 'sample.png') })
-    .addAnswer(`Send video from URL`, {
-        media: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYTJ0ZGdjd2syeXAwMjQ4aWdkcW04OWlqcXI3Ynh1ODkwZ25zZWZ1dCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/LCohAb657pSdHv0Q5h/giphy.mp4',
-    })
-    .addAnswer(`Send audio from URL`, { media: 'https://cdn.freesound.org/previews/728/728142_11861866-lq.mp3' })
-    .addAnswer(`Send file from URL`, {
-        media: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-    })
+const welcomeFlow = addKeyword<Provider, Database>(['hola', 'hi', 'buenos dias', 'buenas'])
+    .addAnswer([
+        '👋 ¡Bienvenido al Hotel Paradise!',
+        '',
+        'Soy tu asistente virtual y estoy aquí para ayudarte.',
+        '',
+        'Escribe *menu* para ver todas las opciones disponibles'
+    ].join('\n'))
 
 const main = async () => {
-    const adapterFlow = createFlow([welcomeFlow, registerFlow, fullSamplesFlow])
+    const adapterFlow = createFlow([
+        welcomeFlow,
+        menuFlow,
+        mealsFlow,
+        activitiesFlow,
+        restaurantsFlow,
+        plansFlow,
+        weatherFlow
+    ])
     
     const adapterProvider = createProvider(Provider)
     const adapterDB = new Database()
@@ -69,45 +141,6 @@ const main = async () => {
         provider: adapterProvider,
         database: adapterDB,
     })
-
-    adapterProvider.server.post(
-        '/v1/messages',
-        handleCtx(async (bot, req, res) => {
-            const { number, message, urlMedia } = req.body
-            await bot.sendMessage(number, message, { media: urlMedia ?? null })
-            return res.end('sended')
-        })
-    )
-
-    adapterProvider.server.post(
-        '/v1/register',
-        handleCtx(async (bot, req, res) => {
-            const { number, name } = req.body
-            await bot.dispatch('REGISTER_FLOW', { from: number, name })
-            return res.end('trigger')
-        })
-    )
-
-    adapterProvider.server.post(
-        '/v1/samples',
-        handleCtx(async (bot, req, res) => {
-            const { number, name } = req.body
-            await bot.dispatch('SAMPLES', { from: number, name })
-            return res.end('trigger')
-        })
-    )
-
-    adapterProvider.server.post(
-        '/v1/blacklist',
-        handleCtx(async (bot, req, res) => {
-            const { number, intent } = req.body
-            if (intent === 'remove') bot.blacklist.remove(number)
-            if (intent === 'add') bot.blacklist.add(number)
-
-            res.writeHead(200, { 'Content-Type': 'application/json' })
-            return res.end(JSON.stringify({ status: 'ok', number, intent }))
-        })
-    )
 
     httpServer(+PORT)
 }
