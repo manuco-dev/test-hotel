@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Hotel Paradise</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">Panel de Administración - Hotel Paradise</h1>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Editar Menús del Día</h2>
+            </div>
+            <div class="card-body">
+                <form id="menuForm">
+                    <div class="mb-3">
+                        <label for="breakfast" class="form-label">Desayuno</label>
+                        <textarea class="form-control" id="breakfast" name="breakfast" rows="3"><%= hotelData.meals.breakfast %></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="lunch" class="form-label">Almuerzo</label>
+                        <textarea class="form-control" id="lunch" name="lunch" rows="3"><%= hotelData.meals.lunch %></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dinner" class="form-label">Cena</label>
+                        <textarea class="form-control" id="dinner" name="dinner" rows="3"><%= hotelData.meals.dinner %></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('menuForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                breakfast: document.getElementById('breakfast').value,
+                lunch: document.getElementById('lunch').value,
+                dinner: document.getElementById('dinner').value
+            };
+
+            try {
+                const response = await fetch('/api/meals', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Menús actualizados correctamente');
+                } else {
+                    alert('Error al actualizar los menús');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al actualizar los menús');
+            }
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

@@ -14,8 +14,12 @@
   "dependencies": {
     "@builderbot/bot": "1.2.9",
     "@builderbot/provider-baileys": "1.2.9",
-    "sharp": "^0.34.3",
-    "axios": "^1.6.7"
+    "axios": "^1.6.7",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "sharp": "^0.34.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
