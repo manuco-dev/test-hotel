@@ -14,7 +14,7 @@ console.log('🚀 Iniciando el bot...')
 
 // Configurar DeepSeek
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY
-const DEEPSEEK_API_URL = 'https://api.deepseek.ai/v1/chat/completions'  // URL corregida
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions'
 
 // Respuestas de respaldo cuando la IA no está disponible
 const fallbackResponses = {
@@ -43,8 +43,7 @@ const askAI = async (prompt: string, context: string = '') => {
                     content: prompt
                 }
             ],
-            temperature: 0.7,
-            max_tokens: 1000
+            stream: false
         }
 
         console.log('📤 Payload:', JSON.stringify(payload, null, 2))
@@ -72,7 +71,8 @@ const askAI = async (prompt: string, context: string = '') => {
         console.error('❌ Error detallado al comunicarse con DeepSeek:', {
             message: error.message,
             response: error.response?.data,
-            status: error.response?.status
+            status: error.response?.status,
+            config: error.config
         })
         
         if (error.response?.status === 429) {
