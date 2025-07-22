@@ -3,7 +3,6 @@ import { createBot, createProvider, createFlow, addKeyword, utils } from '@build
 import { MemoryDB as Database } from '@builderbot/bot'
 import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
 import axios from 'axios'
-import OpenAI from 'openai'
 import * as dotenv from 'dotenv'
 
 // Configurar variables de entorno
@@ -13,10 +12,65 @@ const PORT = 3008
 
 console.log('🚀 Iniciando el bot...')
 
-// Configurar OpenAI
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-})
+// Configurar DeepSeek
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions'
+
+// Respuestas de respaldo cuando la IA no está disponible
+const fallbackResponses = {
+    weather: "🌡️ Clima actual: 25°C - Parcialmente nublado. Excelente día para disfrutar de nuestras instalaciones.",
+    general: "Lo siento, en este momento estoy operando en modo básico. Por favor, usa el comando *menu* para ver las opciones disponibles o contacta a recepción marcando *0* para asistencia personalizada.",
+    concierge: "En este momento estoy operando en modo básico. Te sugiero:\n\n" +
+              "1. Visitar nuestros restaurantes\n" +
+              "2. Participar en las actividades del día\n" +
+              "3. Explorar nuestros planes\n\n" +
+              "Escribe *menu* para ver todas las opciones disponibles."
+}
+
+// Función para interactuar con DeepSeek
+const askAI = async (prompt: string, context: string = '') => {
+    try {
+        const response = await axios.post(
+            DEEPSEEK_API_URL,
+            {
+                messages: [
+                    {
+                        role: "system",
+                        content: `Eres un asistente virtual del Hotel Paradise, un hotel de lujo. ${context}`
+                    },
+                    {
+                        role: "user",
+                        content: prompt
+                    }
+                ],
+                model: "deepseek-chat",
+                temperature: 0.7
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        )
+
+        return response.data.choices[0]?.message?.content || fallbackResponses.general
+    } catch (error) {
+        console.error('Error al comunicarse con DeepSeek:', error)
+        
+        if (error.response?.status === 429) {
+            console.log('Usando respuesta de respaldo debido a límite de API')
+            if (prompt.toLowerCase().includes('clima')) {
+                return fallbackResponses.weather
+            } else if (prompt.toLowerCase().includes('concierge')) {
+                return fallbackResponses.concierge
+            }
+            return fallbackResponses.general
+        }
+        
+        return "Lo siento, hubo un error al procesar tu consulta. Por favor, intenta de nuevo más tarde o contacta a recepción marcando *0*."
+    }
+}
 
 // Datos simulados del hotel
 const hotelData = {
@@ -43,30 +97,6 @@ const hotelData = {
         "💆‍♀️ Plan Relax - Acceso ilimitado al spa",
         "👨‍👩‍👦 Plan Familiar - Actividades para niños y descuentos"
     ]
-}
-
-// Función para interactuar con ChatGPT
-const askChatGPT = async (prompt: string, context: string = '') => {
-    try {
-        const completion = await openai.chat.completions.create({
-            messages: [
-                {
-                    role: "system",
-                    content: `Eres un asistente virtual del Hotel Paradise, un hotel de lujo. ${context}`
-                },
-                {
-                    role: "user",
-                    content: prompt
-                }
-            ],
-            model: "gpt-3.5-turbo",
-        })
-
-        return completion.choices[0]?.message?.content || "Lo siento, no pude procesar tu consulta."
-    } catch (error) {
-        console.error('Error al comunicarse con ChatGPT:', error)
-        return "Lo siento, hubo un error al procesar tu consulta. Por favor, intenta de nuevo más tarde."
-    }
 }
 
 const menuFlow = addKeyword<Provider, Database>(['menu', 'opciones'])
@@ -131,7 +161,7 @@ const plansFlow = addKeyword<Provider, Database>(['4', 'planes'])
 const weatherFlow = addKeyword<Provider, Database>(['5', 'clima'])
     .addAction(async (_, { flowDynamic }) => {
         const weatherPrompt = "Actúa como un experto meteorólogo y proporciona un pronóstico del clima actual para un hotel de lujo. Incluye temperatura, condiciones y recomendaciones para los huéspedes. Mantén la respuesta corta y concisa."
-        const weather = await askChatGPT(weatherPrompt)
+        const weather = await askAI(weatherPrompt)
         await flowDynamic([
             '🌡️ *Pronóstico del Clima*',
             '',
@@ -159,8 +189,12 @@ const chatGPTFlow = addKeyword<Provider, Database>(['consulta', 'pregunta', 'ayu
             - Nuestro objetivo es brindar una experiencia de lujo y confort
             Mantén las respuestas concisas pero informativas y siempre con un tono amable y profesional.
         `
-        const response = await askChatGPT(userMessage, context)
-        await flowDynamic(response)
+        const response = await askAI(userMessage, context)
+        await flowDynamic([
+            response,
+            '',
+            'Escribe *menu* para ver todas las opciones disponibles'
+        ].join('\n'))
     })
 
 const welcomeFlow = addKeyword<Provider, Database>(['hola', 'hi', 'buenos dias', 'buenas'])
@@ -178,7 +212,7 @@ const welcomeFlow = addKeyword<Provider, Database>(['hola', 'hi', 'buenos dias',
 
 const fallbackFlow = addKeyword<Provider, Database>([''])
     .addAction(async (ctx, { flowDynamic }) => {
-        const response = await askChatGPT(ctx.body, "Responde de manera amable y concisa. Si no entiendes la consulta, sugiere usar el comando 'menu' para ver las opciones disponibles.")
+        const response = await askAI(ctx.body, "Responde de manera amable y concisa. Si no entiendes la consulta, sugiere usar el comando 'menu' para ver las opciones disponibles.")
         await flowDynamic(response)
     })
 
