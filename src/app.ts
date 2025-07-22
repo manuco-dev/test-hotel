@@ -14,7 +14,7 @@ console.log('🚀 Iniciando el bot...')
 
 // Configurar DeepSeek
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY
-const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions'
+const DEEPSEEK_API_URL = 'https://api.deepseek.ai/v1/chat/completions'  // URL corregida
 
 // Respuestas de respaldo cuando la IA no está disponible
 const fallbackResponses = {
@@ -30,22 +30,28 @@ const fallbackResponses = {
 // Función para interactuar con DeepSeek
 const askAI = async (prompt: string, context: string = '') => {
     try {
+        console.log('🤖 Enviando solicitud a DeepSeek...')
+        const payload = {
+            model: "deepseek-chat",
+            messages: [
+                {
+                    role: "system",
+                    content: `Eres un asistente virtual del Hotel Paradise, un hotel de lujo. ${context}`
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+            temperature: 0.7,
+            max_tokens: 1000
+        }
+
+        console.log('📤 Payload:', JSON.stringify(payload, null, 2))
+
         const response = await axios.post(
             DEEPSEEK_API_URL,
-            {
-                messages: [
-                    {
-                        role: "system",
-                        content: `Eres un asistente virtual del Hotel Paradise, un hotel de lujo. ${context}`
-                    },
-                    {
-                        role: "user",
-                        content: prompt
-                    }
-                ],
-                model: "deepseek-chat",
-                temperature: 0.7
-            },
+            payload,
             {
                 headers: {
                     'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
@@ -54,12 +60,23 @@ const askAI = async (prompt: string, context: string = '') => {
             }
         )
 
-        return response.data.choices[0]?.message?.content || fallbackResponses.general
+        console.log('📥 Respuesta recibida:', response.data)
+
+        if (response.data && response.data.choices && response.data.choices[0]) {
+            return response.data.choices[0].message.content
+        } else {
+            console.error('❌ Respuesta inesperada de DeepSeek:', response.data)
+            return fallbackResponses.general
+        }
     } catch (error) {
-        console.error('Error al comunicarse con DeepSeek:', error)
+        console.error('❌ Error detallado al comunicarse con DeepSeek:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        })
         
         if (error.response?.status === 429) {
-            console.log('Usando respuesta de respaldo debido a límite de API')
+            console.log('⚠️ Límite de API alcanzado, usando respuesta de respaldo')
             if (prompt.toLowerCase().includes('clima')) {
                 return fallbackResponses.weather
             } else if (prompt.toLowerCase().includes('concierge')) {
@@ -68,7 +85,11 @@ const askAI = async (prompt: string, context: string = '') => {
             return fallbackResponses.general
         }
         
-        return "Lo siento, hubo un error al procesar tu consulta. Por favor, intenta de nuevo más tarde o contacta a recepción marcando *0*."
+        // Mensaje de error más descriptivo
+        return `Lo siento, hubo un problema técnico. Por favor:
+1️⃣ Escribe *menu* para ver las opciones básicas
+2️⃣ O marca *0* para hablar con recepción
+3️⃣ Intenta de nuevo en unos minutos`
     }
 }
 
