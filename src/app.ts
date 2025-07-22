@@ -9,7 +9,7 @@ import * as dotenv from 'dotenv'
 // Configurar variables de entorno
 dotenv.config()
 
-const PORT = process.env.PORT ?? 3008
+const PORT = 3008
 
 // Configurar OpenAI
 const openai = new OpenAI({
