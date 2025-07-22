@@ -5,11 +5,21 @@ import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
 import axios from 'axios'
 import OpenAI from 'openai'
 import * as dotenv from 'dotenv'
+import express from 'express'
+import cors from 'cors'
 
 // Configurar variables de entorno
 dotenv.config()
 
 const PORT = 3008
+const app = express()
+
+// Configurar middleware
+app.use(cors())
+app.use(express.json())
+app.use(express.static('public'))
+
+console.log('🚀 Iniciando el bot...')
 
 // Configurar OpenAI
 const openai = new OpenAI({
@@ -176,6 +186,7 @@ const welcomeFlow = addKeyword<Provider, Database>(['hola', 'hi', 'buenos dias',
     ].join('\n'))
 
 const main = async () => {
+    console.log('📱 Configurando el flujo del bot...')
     const adapterFlow = createFlow([
         welcomeFlow,
         menuFlow,
@@ -187,16 +198,38 @@ const main = async () => {
         chatGPTFlow
     ])
     
-    const adapterProvider = createProvider(Provider)
+    console.log('🔄 Iniciando proveedor de WhatsApp...')
+    const adapterProvider = createProvider(Provider, {
+        qrMobile: true,
+        browser: ['Hotel Paradise Bot', 'Chrome', '4.0.0']
+    })
+
+    // Agregar listeners para eventos importantes
+    adapterProvider.on('qr', () => {
+        console.log('📲 Nuevo código QR generado - Visita http://localhost:3008 para verlo')
+    })
+
+    adapterProvider.on('ready', () => {
+        console.log('✅ Bot conectado y listo!')
+    })
+
+    adapterProvider.on('error', (error) => {
+        console.error('❌ Error en el proveedor:', error)
+    })
+
     const adapterDB = new Database()
 
-    const { handleCtx, httpServer } = await createBot({
+    console.log('🌐 Iniciando servidor web...')
+    const { httpServer } = await createBot({
         flow: adapterFlow,
         provider: adapterProvider,
         database: adapterDB,
     })
 
-    httpServer(+PORT)
+    httpServer(PORT)
+    console.log(`🚀 Servidor iniciado en http://localhost:${PORT}`)
 }
 
-main()
+main().catch(error => {
+    console.error('❌ Error al iniciar el bot:', error)
+})
