@@ -43,7 +43,7 @@ const getWeather = async () => {
     }
 }
 
-const menuFlow = addKeyword<Provider, Database>(['menu', 'opciones', '1'])
+const menuFlow = addKeyword<Provider, Database>(['menu', 'opciones'])
     .addAnswer([
         '🏨 *Bienvenido al Hotel Paradise*',
         '',
