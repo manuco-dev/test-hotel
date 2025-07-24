@@ -5,38 +5,48 @@ import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
 import axios from 'axios'
 import * as dotenv from 'dotenv'
 
-// Configurar variables de entorno
 dotenv.config()
 
 const PORT = 3008
 
-console.log('🚀 Iniciando el bot...')
-
-// Configurar DeepSeek
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions'
 
-// Respuestas de respaldo cuando la IA no está disponible
 const fallbackResponses = {
     weather: "🌡️ Clima actual: 25°C - Parcialmente nublado. Excelente día para disfrutar de nuestras instalaciones.",
     general: "Lo siento, en este momento estoy operando en modo básico. Por favor, usa el comando *menu* para ver las opciones disponibles o contacta a recepción marcando *0* para asistencia personalizada.",
-    concierge: "En este momento estoy operando en modo básico. Te sugiero:\n\n" +
-              "1. Visitar nuestros restaurantes\n" +
-              "2. Participar en las actividades del día\n" +
-              "3. Explorar nuestros planes\n\n" +
-              "Escribe *menu* para ver todas las opciones disponibles."
+    concierge: `En este momento estoy operando en modo básico. Te sugiero:
+
+1. Visitar nuestros restaurantes
+2. Participar en las actividades del día
+3. Explorar nuestros planes
+
+Escribe *menu* para ver todas las opciones disponibles.`
 }
 
-// Función para interactuar con DeepSeek
-const askAI = async (prompt: string, context: string = '') => {
+const askAI = async (prompt, context = '') => {
     try {
-        console.log('🤖 Enviando solicitud a DeepSeek...')
         const payload = {
             model: "deepseek-chat",
             messages: [
                 {
                     role: "system",
-                    content: `Eres un asistente virtual del Hotel Paradise, un hotel de lujo. ${context}`
+                    content: `Eres Sofía, la recepcionista virtual del Hotel Paradise, un hotel de lujo frente al mar.
+Estás entrenada para ofrecer atención cálida, profesional y útil a los huéspedes.
+Tu misión es brindar una experiencia excepcional durante su estancia.
+
+🔎 Información útil:
+- Servicios: restaurantes, spa, piscina, actividades, room service, planes todo incluido
+- Actividades destacadas del día (yoga, baile, piscina)
+- Planes disponibles: Aventura, Relax, Familiar, Todo Incluido
+
+🧠 Estilo de respuesta:
+- Sé clara, empática y directa.
+- Si el usuario se presenta (ej: 'Soy Manuel'), salúdalo por su nombre.
+- Si la pregunta no es relevante, invita a usar el menú.
+- Finaliza siempre con: “¿Deseas ver el menú principal? Escribe *menu*.”
+
+${context}`
                 },
                 {
                     role: "user",
@@ -45,8 +55,6 @@ const askAI = async (prompt: string, context: string = '') => {
             ],
             stream: false
         }
-
-        console.log('📤 Payload:', JSON.stringify(payload, null, 2))
 
         const response = await axios.post(
             DEEPSEEK_API_URL,
@@ -59,46 +67,27 @@ const askAI = async (prompt: string, context: string = '') => {
             }
         )
 
-        console.log('📥 Respuesta recibida:', response.data)
-
         if (response.data && response.data.choices && response.data.choices[0]) {
             return response.data.choices[0].message.content
         } else {
-            console.error('❌ Respuesta inesperada de DeepSeek:', response.data)
             return fallbackResponses.general
         }
     } catch (error) {
-        console.error('❌ Error detallado al comunicarse con DeepSeek:', {
-            message: error.message,
-            response: error.response?.data,
-            status: error.response?.status,
-            config: error.config
-        })
-        
         if (error.response?.status === 429) {
-            console.log('⚠️ Límite de API alcanzado, usando respuesta de respaldo')
-            if (prompt.toLowerCase().includes('clima')) {
-                return fallbackResponses.weather
-            } else if (prompt.toLowerCase().includes('concierge')) {
-                return fallbackResponses.concierge
-            }
+            if (prompt.toLowerCase().includes('clima')) return fallbackResponses.weather
+            if (prompt.toLowerCase().includes('concierge')) return fallbackResponses.concierge
             return fallbackResponses.general
         }
-        
-        // Mensaje de error más descriptivo
-        return `Lo siento, hubo un problema técnico. Por favor:
-1️⃣ Escribe *menu* para ver las opciones básicas
-2️⃣ O marca *0* para hablar con recepción
-3️⃣ Intenta de nuevo en unos minutos`
+
+        return `😔 Lo siento, estoy teniendo problemas para acceder a la información en este momento.\n\nPuedes:\n1️⃣ Escribir *menu* para ver las opciones básicas  \n2️⃣ O marcar *0* para contactar a recepción  \n\nGracias por tu paciencia.`
     }
 }
 
-// Datos simulados del hotel
 const hotelData = {
     meals: {
-        breakfast: "🍳 Desayuno de hoy: Huevos revueltos, pan recién horneado, frutas frescas, café/té",
-        lunch: "🍝 Almuerzo de hoy: Pasta al pesto, ensalada César, sopa del día",
-        dinner: "🍖 Cena de hoy: Filete de res, puré de papas, vegetales asados"
+        breakfast: "Huevos revueltos, pan recién horneado, frutas frescas, café/té",
+        lunch: "Pasta al pesto, ensalada César, sopa del día",
+        dinner: "Filete de res, puré de papas, vegetales asados"
     },
     activities: [
         "🏊‍♂️ 9:00 AM - Clase de natación en la piscina",
@@ -120,7 +109,7 @@ const hotelData = {
     ]
 }
 
-const menuFlow = addKeyword<Provider, Database>(['menu', 'opciones'])
+const menuFlow = addKeyword(['menu', 'opciones'])
     .addAnswer([
         '🏨 *Bienvenido al Hotel Paradise*',
         '',
@@ -136,108 +125,85 @@ const menuFlow = addKeyword<Provider, Database>(['menu', 'opciones'])
         'Responde con el número de la opción que deseas consultar'
     ].join('\n'))
 
-const mealsFlow = addKeyword<Provider, Database>(['1', 'menu del dia', 'comida'])
+const mealsFlow = addKeyword(['1', 'menu del dia', 'comida'])
     .addAnswer([
-        '🍽️ *Menú del día*',
+        '🍽️ *Aquí tienes el menú del día:*',
         '',
-        '*Desayuno*',
-        hotelData.meals.breakfast,
+        `🥐 *Desayuno:* ${hotelData.meals.breakfast}`,
+        `🍝 *Almuerzo:* ${hotelData.meals.lunch}`,
+        `🍖 *Cena:* ${hotelData.meals.dinner}`,
         '',
-        '*Almuerzo*',
-        hotelData.meals.lunch,
-        '',
-        '*Cena*',
-        hotelData.meals.dinner,
-        '',
-        'Escribe *menu* para volver al menú principal'
-    ].join('\n'))
+        '¿Deseas hacer una reserva o saber más? Escribe *menu* para volver.'
+    ])
 
-const activitiesFlow = addKeyword<Provider, Database>(['2', 'actividades'])
+const activitiesFlow = addKeyword(['2', 'actividades'])
     .addAnswer([
         '📅 *Actividades de hoy*',
         '',
         ...hotelData.activities,
         '',
-        'Escribe *menu* para volver al menú principal'
-    ].join('\n'))
+        '¿Te gustaría participar en alguna? Escribe *menu* para ver más opciones.'
+    ])
 
-const restaurantsFlow = addKeyword<Provider, Database>(['3', 'restaurantes'])
+const restaurantsFlow = addKeyword(['3', 'restaurantes'])
     .addAnswer([
         '🍽️ *Restaurantes Recomendados*',
         '',
         ...hotelData.restaurants,
         '',
-        'Escribe *menu* para volver al menú principal'
-    ].join('\n'))
+        '¿Quieres reservar en alguno? Escribe *menu* para volver al menú principal.'
+    ])
 
-const plansFlow = addKeyword<Provider, Database>(['4', 'planes'])
+const plansFlow = addKeyword(['4', 'planes'])
     .addAnswer([
         '💫 *Planes del Hotel*',
         '',
         ...hotelData.hotelPlans,
         '',
-        'Escribe *menu* para volver al menú principal'
-    ].join('\n'))
+        '¿Deseas más información? Escribe *menu* para volver al menú principal.'
+    ])
 
-const weatherFlow = addKeyword<Provider, Database>(['5', 'clima'])
+const weatherFlow = addKeyword(['5', 'clima'])
     .addAction(async (_, { flowDynamic }) => {
         const weatherPrompt = "Actúa como un experto meteorólogo y proporciona un pronóstico del clima actual para un hotel de lujo. Incluye temperatura, condiciones y recomendaciones para los huéspedes. Mantén la respuesta corta y concisa."
         const weather = await askAI(weatherPrompt)
         await flowDynamic([
-            '🌡️ *Pronóstico del Clima*',
+            '🌤️ *Pronóstico del Clima*',
             '',
             weather,
             '',
-            'Escribe *menu* para volver al menú principal'
+            '¿Quieres planear alguna actividad? Escribe *menu* para ver opciones.'
         ].join('\n'))
     })
 
-const welcomeFlow = addKeyword<Provider, Database>(['hola', 'hi', 'buenos dias', 'buenas'])
+const welcomeFlow = addKeyword(['hola', 'hi', 'buenos dias', 'buenas'])
     .addAnswer([
         '👋 ¡Bienvenido al Hotel Paradise!',
         '',
-        'Soy tu asistente virtual potenciado por IA y estoy aquí para ayudarte.',
+        'Soy Sofía, tu recepcionista virtual. Estoy aquí para ayudarte en lo que necesites durante tu estancia.',
         '',
         'Puedes:',
-        '- Hacerme cualquier pregunta sobre el hotel directamente',
-        '- Escribir *menu* para ver todas las opciones disponibles',
+        '- Preguntarme sobre servicios, actividades o promociones',
+        '- Escribir *menu* para ver las opciones disponibles',
         '',
-        '¡Estoy aquí para hacer tu estancia más placentera! 🌟'
-    ].join('\n'))
+        '¡Estoy encantada de asistirte! 🌟'
+    ])
 
-const fallbackFlow = addKeyword<Provider, Database>([''])
+const fallbackFlow = addKeyword([''])
     .addAction(async (ctx, { flowDynamic }) => {
-        // Lista de palabras clave reservadas para comandos del menú
-        const menuKeywords = ['menu', 'opciones', '1', '2', '3', '4', '5', 'hola', 'hi', 'buenos dias', 'buenas']
-        
-        // Si el mensaje es una palabra clave del menú, no procesamos con la IA
-        if (menuKeywords.includes(ctx.body.toLowerCase())) return
+        const reservedKeywords = ['menu', 'opciones', '1', '2', '3', '4', '5', 'hola', 'hi', 'buenos dias', 'buenas']
+        const userInput = ctx.body.toLowerCase().trim()
+        if (reservedKeywords.includes(userInput) || /^\d$/.test(userInput)) return
 
-        const context = `
-            Responde como un concierge profesional del Hotel Paradise.
-            Información del hotel:
-            - Tenemos restaurantes de diferentes especialidades
-            - Ofrecemos actividades diarias como yoga, natación y entretenimiento nocturno
-            - Contamos con diferentes planes: Todo Incluido, Aventura, Relax y Familiar
-            - Nuestro objetivo es brindar una experiencia de lujo y confort
-            
-            Reglas de respuesta:
-            - Mantén las respuestas concisas pero informativas
-            - Usa un tono amable y profesional
-            - Si la pregunta no está clara o no está relacionada con el hotel, sugiere usar el menú
-            - Incluye siempre un recordatorio del menú al final de cada respuesta
-        `
-
-        const response = await askAI(ctx.body, context)
+        const response = await askAI(userInput)
         await flowDynamic([
             response,
             '',
-            'Escribe *menu* para ver todas las opciones disponibles'
+            '¿Puedo ayudarte con algo más? Escribe *menu* para ver opciones.'
         ].join('\n'))
     })
 
 const main = async () => {
-    console.log('📱 Configurando el flujo del bot...')
     const adapterFlow = createFlow([
         welcomeFlow,
         menuFlow,
@@ -248,14 +214,12 @@ const main = async () => {
         weatherFlow,
         fallbackFlow
     ])
-    
-    console.log('🔄 Iniciando proveedor de WhatsApp...')
+
     const adapterProvider = createProvider(Provider, {
         qrMobile: true,
         browser: ['Hotel Paradise Bot', 'Chrome', '4.0.0']
     })
 
-    // Agregar listeners para eventos importantes
     adapterProvider.on('qr', () => {
         console.log('📲 Nuevo código QR generado - Visita http://localhost:3008 para verlo')
     })
@@ -270,7 +234,6 @@ const main = async () => {
 
     const adapterDB = new Database()
 
-    console.log('🌐 Iniciando servidor web...')
     const { httpServer } = await createBot({
         flow: adapterFlow,
         provider: adapterProvider,
@@ -281,6 +244,4 @@ const main = async () => {
     console.log(`🚀 Servidor iniciado en http://localhost:${PORT}`)
 }
 
-main().catch(error => {
-    console.error('❌ Error al iniciar el bot:', error)
-})
+main().catch(console.error)
