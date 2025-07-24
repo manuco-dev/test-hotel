@@ -192,14 +192,26 @@ const weatherFlow = addKeyword<Provider, Database>(['5', 'clima'])
         ].join('\n'))
     })
 
-const chatGPTFlow = addKeyword<Provider, Database>(['consulta', 'pregunta', 'ayuda'])
+const welcomeFlow = addKeyword<Provider, Database>(['hola', 'hi', 'buenos dias', 'buenas'])
     .addAnswer([
-        '¿En qué puedo ayudarte? Puedes preguntarme cualquier cosa sobre el hotel.',
-        'Para volver al menú principal, escribe *menu*'
+        '👋 ¡Bienvenido al Hotel Paradise!',
+        '',
+        'Soy tu asistente virtual potenciado por IA y estoy aquí para ayudarte.',
+        '',
+        'Puedes:',
+        '- Hacerme cualquier pregunta sobre el hotel directamente',
+        '- Escribir *menu* para ver todas las opciones disponibles',
+        '',
+        '¡Estoy aquí para hacer tu estancia más placentera! 🌟'
     ].join('\n'))
+
+const fallbackFlow = addKeyword<Provider, Database>([''])
     .addAction(async (ctx, { flowDynamic }) => {
-        const userMessage = ctx.body
-        if (userMessage.toLowerCase() === 'menu') return
+        // Lista de palabras clave reservadas para comandos del menú
+        const menuKeywords = ['menu', 'opciones', '1', '2', '3', '4', '5', 'hola', 'hi', 'buenos dias', 'buenas']
+        
+        // Si el mensaje es una palabra clave del menú, no procesamos con la IA
+        if (menuKeywords.includes(ctx.body.toLowerCase())) return
 
         const context = `
             Responde como un concierge profesional del Hotel Paradise.
@@ -208,33 +220,20 @@ const chatGPTFlow = addKeyword<Provider, Database>(['consulta', 'pregunta', 'ayu
             - Ofrecemos actividades diarias como yoga, natación y entretenimiento nocturno
             - Contamos con diferentes planes: Todo Incluido, Aventura, Relax y Familiar
             - Nuestro objetivo es brindar una experiencia de lujo y confort
-            Mantén las respuestas concisas pero informativas y siempre con un tono amable y profesional.
+            
+            Reglas de respuesta:
+            - Mantén las respuestas concisas pero informativas
+            - Usa un tono amable y profesional
+            - Si la pregunta no está clara o no está relacionada con el hotel, sugiere usar el menú
+            - Incluye siempre un recordatorio del menú al final de cada respuesta
         `
-        const response = await askAI(userMessage, context)
+
+        const response = await askAI(ctx.body, context)
         await flowDynamic([
             response,
             '',
             'Escribe *menu* para ver todas las opciones disponibles'
         ].join('\n'))
-    })
-
-const welcomeFlow = addKeyword<Provider, Database>(['hola', 'hi', 'buenos dias', 'buenas'])
-    .addAnswer([
-        '👋 ¡Bienvenido al Hotel Paradise!',
-        '',
-        'Soy tu asistente virtual potenciado por IA y estoy aquí para ayudarte.',
-        '',
-        'Puedes:',
-        '- Escribir *menu* para ver todas las opciones disponibles',
-        '- Escribir *consulta* para hacer preguntas generales',
-        '',
-        '¡Estoy aquí para hacer tu estancia más placentera! 🌟'
-    ].join('\n'))
-
-const fallbackFlow = addKeyword<Provider, Database>([''])
-    .addAction(async (ctx, { flowDynamic }) => {
-        const response = await askAI(ctx.body, "Responde de manera amable y concisa. Si no entiendes la consulta, sugiere usar el comando 'menu' para ver las opciones disponibles.")
-        await flowDynamic(response)
     })
 
 const main = async () => {
@@ -247,7 +246,6 @@ const main = async () => {
         restaurantsFlow,
         plansFlow,
         weatherFlow,
-        chatGPTFlow,
         fallbackFlow
     ])
     
